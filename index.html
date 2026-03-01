@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mobile Space Shooter</title>
+<style>
+  body { margin:0; overflow:hidden; background:black; font-family:Arial; color:white; }
+  canvas { display:block; margin:0 auto; background:#000; touch-action: none; }
+  #score { position:absolute; top:10px; left:10px; font-size:24px; }
+  .button {
+    position: fixed;
+    bottom: 10px;
+    width: 80px;
+    height: 80px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    text-align: center;
+    line-height: 80px;
+    font-size: 24px;
+    user-select:none;
+  }
+  #left { left: 10px; }
+  #right { left: 100px; }
+  #shoot { right: 10px; }
+</style>
+</head>
+<body>
+
+<div id="score">Score: 0</div>
+<canvas id="gameCanvas"></canvas>
+
+<!-- Mobile buttons -->
+<div id="left" class="button">&#8592;</div>
+<div id="right" class="button">&#8594;</div>
+<div id="shoot" class="button">&#9679;</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Make canvas full screen
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+let score = 0;
+let bullets = [];
+let enemies = [];
+let explosions = [];
+
+const player = {
+  width: 50,
+  height: 50,
+  x: window.innerWidth/2 - 25,
+  y: window.innerHeight - 80,
+  speed: 7,
+  color: 'cyan'
+};
+
+const keys = {};
+
+// On-screen buttons
+document.getElementById('left').addEventListener('touchstart', () => keys['ArrowLeft']=true);
+document.getElementById('left').addEventListener('touchend', () => keys['ArrowLeft']=false);
+document.getElementById('right').addEventListener('touchstart', () => keys['ArrowRight']=true);
+document.getElementById('right').addEventListener('touchend', () => keys['ArrowRight']=false);
+document.getElementById('shoot').addEventListener('touchstart', () => {
+  if(!keys.shootCooldown) { shoot(); keys.shootCooldown = 15; }
+});
+
+// Keyboard controls for desktop
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+// Shoot bullet
+function shoot() {
+  bullets.push({ x: player.x + player.width/2 - 5, y: player.y, width:10, height:20, speed:10 });
+}
+
+// Create enemy
+function createEnemy() {
+  const x = Math.random() * (canvas.width - 40);
+  enemies.push({ x:x, y:-40, width:40, height:40, speed: 3 + Math.random()*2 });
+}
+
+// Collision detection
+function isColliding(a,b) {
+  return a.x < b.x+b.width && a.x+a.width > b.x &&
+         a.y < b.y+b.height && a.y+a.height > b.y;
+}
+
+// Add explosion effect
+function addExplosion(x,y) { explosions.push({x,y,radius:0,maxRadius:20}); }
+
+// Game update
+function update() {
+  // Move player
+  if(keys['ArrowLeft'] && player.x>0) player.x -= player.speed;
+  if(keys['ArrowRight'] && player.x+player.width<canvas.width) player.x += player.speed;
+  if(keys['Space']) { if(!keys.shootCooldown){shoot();keys.shootCooldown=15;} }
+
+  if(keys.shootCooldown) keys.shootCooldown--;
+
+  // Move bullets
+  bullets.forEach((b,i)=>{ b.y-=b.speed; if(b.y<-b.height) bullets.splice(i,1); });
+
+  // Move enemies
+  enemies.forEach((e,i)=>{ 
+    e.y+=e.speed; 
+    if(e.y>canvas.height) enemies.splice(i,1); 
+  });
+
+  // Bullet-enemy collisions
+  bullets.forEach((b,bi)=>{ 
+    enemies.forEach((e,ei)=>{ 
+      if(isColliding(b,e)){ addExplosion(e.x+e.width/2,e.y+e.height/2); bullets.splice(bi,1); enemies.splice(ei,1); score++; }
+    });
+  });
+
+  // Update explosions
+  explosions.forEach((ex,i)=>{ ex.radius+=2; if(ex.radius>ex.maxRadius) explosions.splice(i,1); });
+
+  // Spawn enemies
+  if(Math.random()<0.02) createEnemy();
+
+  draw();
+  requestAnimationFrame(update);
+}
+
+// Draw everything
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Player
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // Bullets
+  ctx.fillStyle='yellow';
+  bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height));
+
+  // Enemies
+  ctx.fillStyle='red';
+  enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.width,e.height));
+
+  // Explosions
+  ctx.fillStyle='orange';
+  explosions.forEach(ex=>{
+    ctx.beginPath();
+    ctx.arc(ex.x,ex.y,ex.radius,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // Score
+  document.getElementById('score').innerText = `Score: ${score}`;
+}
+
+update();
+</script>
+
+</body>
+</html>
